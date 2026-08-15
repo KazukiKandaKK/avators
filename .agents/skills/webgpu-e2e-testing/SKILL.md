@@ -80,7 +80,7 @@ description: How to end-to-end test WebGPU apps in a headless/CI environment tha
 - `agent-browser fill` on `<input type="range">` may not fire `input` events. Prefer JS `input.value = '1.2'; input.dispatchEvent(new Event('input', { bubbles: true }))`.
 - The real `pointerdown`/`pointermove` orbit handlers call `canvas.setPointerCapture`, so synthetic `PointerEvent`s may throw unless they have a valid active pointer. Use real mouse commands or skip capture.
 - Chrome for Testing may default to `--disable-gpu` and `--use-angle=swiftshader-webgl`, so `requestAdapter()` returns `null`. This is the normal fallback path (`No WebGPU adapter found.`).
-- A `#canvas { width: 100% }` rule alongside `flex: 1` in a horizontal flex container can collapse the controls panel; this is a real layout bug if it reproduces.
+- A `#canvas { width: 100% }` rule alongside `flex: 1` in a horizontal flex container can collapse the controls panel. If `#controls` collapses to ~40 px, add `min-width: 0` to `#canvas` and `flex-shrink: 0` to `#controls` to keep the panel at its intended width (e.g. 300 px).
 
 ## Devin Secrets Needed
 
