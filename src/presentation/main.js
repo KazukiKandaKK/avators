@@ -100,6 +100,10 @@ function setupOrbit() {
 }
 
 async function main() {
+  setupControls();
+  setupOrbit();
+  updateUIFromParams();
+
   try {
     const { device, context, format } = await initWebGPU(canvas);
     const renderer = createRenderer(device, context, format);
@@ -116,9 +120,6 @@ async function main() {
 
     new ResizeObserver(resize).observe(canvas);
     resize();
-    setupControls();
-    setupOrbit();
-    updateUIFromParams();
 
     const render = () => {
       const time = performance.now() / 1000;
