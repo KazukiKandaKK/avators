@@ -34,84 +34,30 @@ struct Uniforms {
 
 @binding(0) @group(0) var<uniform> u: Uniforms;
 
-fn sdSphere(p: vec3f, r: f32) -> f32 {
+fn fill(d: f32, color: vec3f, base: vec3f) -> vec3f {
+  let a = 1.0 - smoothstep(-0.005, 0.005, d);
+  return mix(base, color, a);
+}
+
+fn fillSoft(d: f32, color: vec3f, base: vec3f, alpha: f32) -> vec3f {
+  let a = alpha * (1.0 - smoothstep(-0.01, 0.01, d));
+  return mix(base, color, a);
+}
+
+fn sdCircle(p: vec2f, r: f32) -> f32 {
   return length(p) - r;
 }
 
-fn sdCapsule(p: vec3f, a: vec3f, b: vec3f, r: f32) -> f32 {
+fn sdEllipse(p: vec2f, ab: vec2f) -> f32 {
+  let k = length(p / ab);
+  return k - 1.0;
+}
+
+fn sdCapsule(p: vec2f, a: vec2f, b: vec2f, r: f32) -> f32 {
   let pa = p - a;
   let ba = b - a;
   let h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
   return length(pa - ba * h) - r;
-}
-
-fn rotateX(p: vec3f, angle: f32) -> vec3f {
-  let c = cos(angle);
-  let s = sin(angle);
-  return vec3f(p.x, c * p.y - s * p.z, s * p.y + c * p.z);
-}
-
-fn rotateY(p: vec3f, angle: f32) -> vec3f {
-  let c = cos(angle);
-  let s = sin(angle);
-  return vec3f(c * p.x + s * p.z, p.y, -s * p.x + c * p.z);
-}
-
-fn map(p: vec3f) -> vec2f {
-  let h = u.head_radius;
-  var res = vec2f(sdSphere(p, h), 0.0);
-
-  // hair shell above the head
-  let outer = length(p) - (h + u.hair_amount);
-  let inner = h - length(p);
-  var hair = max(outer, inner);
-  hair = max(hair, -p.y - 0.2 * h);
-  if (hair < res.x) {
-    res = vec2f(hair, 1.0);
-  }
-
-  // eyes
-  let eyeY = 0.15 * h;
-  let eyeZ = -sqrt(max(0.0, h * h - u.eye_spacing * u.eye_spacing - eyeY * eyeY));
-  let leftEye = vec3f(-u.eye_spacing, eyeY, eyeZ);
-  let rightEye = vec3f(u.eye_spacing, eyeY, eyeZ);
-  let dEyes = min(sdSphere(p - leftEye, u.eye_size), sdSphere(p - rightEye, u.eye_size));
-  if (dEyes < res.x) {
-    res = vec2f(dEyes, 2.0);
-  }
-
-  // mouth
-  let mouthW = u.mouth_width * h;
-  let mouthY = -0.25 * h;
-  let mouthZ = -sqrt(max(0.0, h * h - mouthW * mouthW - mouthY * mouthY));
-  let mouthA = vec3f(-mouthW, mouthY, mouthZ);
-  let mouthB = vec3f(mouthW, mouthY, mouthZ);
-  let dMouth = sdCapsule(p, mouthA, mouthB, 0.03 * h + u.mouth_smile);
-  if (dMouth < res.x) {
-    res = vec2f(dMouth, 3.0);
-  }
-
-  return res;
-}
-
-fn calcNormal(p: vec3f) -> vec3f {
-  let eps = 0.001;
-  let n = vec3f(
-    map(p + vec3f(eps, 0.0, 0.0)).x - map(p - vec3f(eps, 0.0, 0.0)).x,
-    map(p + vec3f(0.0, eps, 0.0)).x - map(p - vec3f(0.0, eps, 0.0)).x,
-    map(p + vec3f(0.0, 0.0, eps)).x - map(p - vec3f(0.0, 0.0, eps)).x
-  );
-  return normalize(n);
-}
-
-fn materialColor(mat: f32) -> vec3f {
-  switch (i32(mat)) {
-    case 0: { return u.skin_color; }
-    case 1: { return u.hair_color; }
-    case 2: { return u.eye_color; }
-    case 3: { return vec3f(0.6, 0.1, 0.1); }
-    default: { return vec3f(1.0); }
-  }
 }
 
 @vertex
@@ -127,50 +73,100 @@ fn vsMain(@builtin(vertex_index) vi: u32) -> @builtin(position) vec4f {
 @fragment
 fn fsMain(@builtin(position) fragCoord: vec4f) -> @location(0) vec4f {
   let aspect = u.resolution.x / u.resolution.y;
+  // fragCoord.y grows downward, so flip Y so +Y points up on screen.
   var uv = (fragCoord.xy / u.resolution - 0.5) * 2.0;
+  uv.y = -uv.y;
   uv.x *= aspect;
 
-  var ro = vec3f(0.0, 0.0, 3.0);
-  var rd = normalize(vec3f(uv.x, uv.y, -1.5));
+  let h = u.head_radius;
+  let hairW = h * (0.05 + u.hair_amount * 0.5);
+  let hairH = h * (0.05 + u.hair_amount * 0.5);
 
-  ro = rotateY(ro, u.rot_y);
-  ro = rotateX(ro, u.rot_x);
-  rd = rotateY(rd, u.rot_y);
-  rd = rotateX(rd, u.rot_x);
+  // soft cream background
+  var col = vec3f(0.98, 0.96, 0.94);
 
-  var t = 0.0;
-  var hit = false;
-  var mat = 0.0;
-  for (var i = 0; i < 80; i = i + 1) {
-    let p = ro + rd * t;
-    let d = map(p);
-    if (d.x < 0.001) {
-      hit = true;
-      mat = d.y;
-      break;
-    }
-    if (t > 50.0) {
-      break;
-    }
-    t += d.x;
-  }
+  // back hair drawn behind the face
+  let backHair = sdEllipse(uv - vec2f(0.0, 0.05 * h), vec2f(h * 0.9 + hairW, h * 1.0 + hairH));
+  col = fill(backHair, u.hair_color, col);
 
-  if (!hit) {
-    let bg = mix(
-      vec3f(0.85, 0.9, 0.95),
-      vec3f(0.6, 0.75, 0.9),
-      fragCoord.y / u.resolution.y
-    );
-    return vec4f(bg, 1.0);
-  }
+  // face skin
+  let face = sdEllipse(uv, vec2f(h * 0.95, h * 1.05));
+  col = fill(face, u.skin_color, col);
 
-  let p = ro + rd * t;
-  let n = calcNormal(p);
-  let light = normalize(vec3f(0.5, 0.8, -0.5));
-  let diff = max(dot(n, light), 0.0);
-  let ambient = 0.3;
-  let spec = pow(max(dot(reflect(-light, n), -rd), 0.0), 16.0);
-  let col = materialColor(mat) * (diff + ambient) + vec3f(0.1) * spec;
+  // blush
+  let blushL = sdCircle(uv - vec2f(-h * 0.45, -h * 0.12), h * 0.11);
+  let blushR = sdCircle(uv - vec2f(h * 0.45, -h * 0.12), h * 0.11);
+  col = fillSoft(blushL, vec3f(1.0, 0.75, 0.75), col, 0.25);
+  col = fillSoft(blushR, vec3f(1.0, 0.75, 0.75), col, 0.25);
+
+  // eyes
+  let eyeY = h * 0.05;
+  let eyeX = u.eye_spacing * h;
+  let eyeW = u.eye_size * 0.85;
+  let eyeH = u.eye_size * 1.25;
+  let eyeShape = vec2f(eyeW, eyeH);
+
+  let leftEyePos = vec2f(-eyeX, eyeY);
+  let rightEyePos = vec2f(eyeX, eyeY);
+
+  let leftWhite = sdEllipse(uv - leftEyePos, eyeShape);
+  let rightWhite = sdEllipse(uv - rightEyePos, eyeShape);
+  col = fill(leftWhite, vec3f(1.0), col);
+  col = fill(rightWhite, vec3f(1.0), col);
+
+  let irisR = u.eye_size * 0.55;
+  let leftIris = sdCircle(uv - leftEyePos, irisR);
+  let rightIris = sdCircle(uv - rightEyePos, irisR);
+  col = fill(leftIris, u.eye_color, col);
+  col = fill(rightIris, u.eye_color, col);
+
+  let pupilR = irisR * 0.45;
+  let leftPupil = sdCircle(uv - leftEyePos, pupilR);
+  let rightPupil = sdCircle(uv - rightEyePos, pupilR);
+  col = fill(leftPupil, vec3f(0.0), col);
+  col = fill(rightPupil, vec3f(0.0), col);
+
+  let highR = pupilR * 0.5;
+  let leftHigh = sdCircle(uv - (leftEyePos + vec2f(-pupilR * 0.3, pupilR * 0.35)), highR);
+  let rightHigh = sdCircle(uv - (rightEyePos + vec2f(-pupilR * 0.3, pupilR * 0.35)), highR);
+  col = fill(leftHigh, vec3f(1.0), col);
+  col = fill(rightHigh, vec3f(1.0), col);
+
+  // eyebrows
+  let browY = eyeY + h * 0.22;
+  let browW = h * 0.18;
+  let browThick = h * 0.022;
+  let browDrop = h * 0.04;
+  let leftBrow = sdCapsule(uv, vec2f(-eyeX - browW, browY), vec2f(-eyeX + browW, browY + browDrop), browThick);
+  let rightBrow = sdCapsule(uv, vec2f(eyeX - browW, browY + browDrop), vec2f(eyeX + browW, browY), browThick);
+  col = fill(leftBrow, u.hair_color, col);
+  col = fill(rightBrow, u.hair_color, col);
+
+  // mouth
+  let mouthY = -h * 0.35;
+  let mouthW = u.mouth_width * h * 0.35;
+  let mouthH = max(0.005, u.mouth_smile * h * 0.5);
+  let mouth = sdEllipse(uv - vec2f(0.0, mouthY), vec2f(mouthW, mouthH));
+  col = fill(mouth, vec3f(0.45, 0.12, 0.12), col);
+
+  // front bangs over the face
+  let bangTop = sdEllipse(uv - vec2f(0.0, h * 0.52), vec2f(h * 0.7 + hairW * 0.6, h * 0.22 + hairH * 0.2));
+  let bangSideL = sdEllipse(uv - vec2f(-h * 0.55 - hairW * 0.3, h * 0.05), vec2f(h * 0.18 + hairW * 0.25, h * 0.42 + hairH * 0.35));
+  let bangSideR = sdEllipse(uv - vec2f(h * 0.55 + hairW * 0.3, h * 0.05), vec2f(h * 0.18 + hairW * 0.25, h * 0.42 + hairH * 0.35));
+  var bang = min(bangTop, min(bangSideL, bangSideR));
+
+  // carve out space for the eyes so bangs do not cover them
+  let eyeMaskR = u.eye_size * 1.6;
+  let leftMask = sdCircle(uv - leftEyePos, eyeMaskR);
+  let rightMask = sdCircle(uv - rightEyePos, eyeMaskR);
+  let eyeMask = min(leftMask, rightMask);
+  bang = max(bang, -eyeMask);
+
+  // keep bangs above the mouth/cheek line
+  bang = max(bang, -uv.y - h * 0.15);
+
+  col = fill(bang, u.hair_color, col);
+
   return vec4f(col, 1.0);
 }
 `;

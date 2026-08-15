@@ -1,10 +1,10 @@
 export const DEFAULT_PARAMS = Object.freeze({
   headRadius: 0.8,
-  hairAmount: 0.1,
-  skinColor: '#ffdbac',
+  hairAmount: 0.25,
+  skinColor: '#ffe0bd',
   hairColor: '#3e2723',
-  eyeColor: '#212121',
-  eyeSize: 0.08,
+  eyeColor: '#4a90e2',
+  eyeSize: 0.12,
   eyeSpacing: 0.25,
   mouthWidth: 0.2,
   mouthSmile: 0.0,
@@ -15,7 +15,7 @@ export const DEFAULT_PARAMS = Object.freeze({
 const LIMITS = Object.freeze({
   headRadius: { min: 0.5, max: 1.2 },
   hairAmount: { min: 0.0, max: 0.4 },
-  eyeSize: { min: 0.03, max: 0.15 },
+  eyeSize: { min: 0.03, max: 0.25 },
   eyeSpacing: { min: 0.05, max: 0.5 },
   mouthWidth: { min: 0.05, max: 0.5 },
   mouthSmile: { min: 0.0, max: 0.3 },

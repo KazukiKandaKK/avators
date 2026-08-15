@@ -1,5 +1,5 @@
 import { initWebGPU, createRenderer } from '../infrastructure/webgpu.js';
-import { createAvatarParams, paramsToArray, DEFAULT_PARAMS } from '../domain/avatar.js';
+import { createAvatarParams, paramsToArray } from '../domain/avatar.js';
 
 const canvas = document.getElementById('canvas');
 const errorBox = document.getElementById('error');
@@ -64,44 +64,8 @@ function setupControls() {
   });
 }
 
-function setupOrbit() {
-  let dragging = false;
-  let lastX = 0;
-  let lastY = 0;
-
-  canvas.addEventListener('pointerdown', (e) => {
-    dragging = true;
-    lastX = e.clientX;
-    lastY = e.clientY;
-    canvas.setPointerCapture(e.pointerId);
-  });
-
-  canvas.addEventListener('pointermove', (e) => {
-    if (!dragging) return;
-    const dx = e.clientX - lastX;
-    const dy = e.clientY - lastY;
-    lastX = e.clientX;
-    lastY = e.clientY;
-    const rotY = params.rotY + dx * 0.01;
-    const rotX = params.rotX - dy * 0.01;
-    setParam('rotY', rotY);
-    setParam('rotX', rotX);
-  });
-
-  canvas.addEventListener('pointerup', (e) => {
-    dragging = false;
-    canvas.releasePointerCapture(e.pointerId);
-  });
-
-  canvas.addEventListener('pointerleave', (e) => {
-    dragging = false;
-    canvas.releasePointerCapture(e.pointerId);
-  });
-}
-
 async function main() {
   setupControls();
-  setupOrbit();
   updateUIFromParams();
 
   try {
